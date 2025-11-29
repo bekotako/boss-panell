@@ -2,17 +2,24 @@ import { NextResponse } from 'next/server';
 
 export async function POST(req: Request) {
   try {
-    // 1. Gizli anahtarı sunucudan al
+    // 1. Sunucudaki Anahtarı Kontrol Et
     const apiKey = process.env.GROQ_API_KEY;
     
+    // Konsola durum raporu yaz (Şifrenin tamamını göstermez, sadece var mı yok mu der)
+    console.log("API Key Durumu:", apiKey ? "✅ Mevcut" : "❌ EKSİK!");
+
     if (!apiKey) {
-      return NextResponse.json({ error: 'Sunucu tarafında API anahtarı eksik.' }, { status: 500 });
+      return NextResponse.json(
+        { error: "Sunucu hatası: API Anahtarı bulunamadı. Lütfen .env.local dosyasını kontrol edin." }, 
+        { status: 500 }
+      );
     }
 
-    // 2. Frontend'den gelen veriyi oku
-    const { prompt } = await req.json();
+    // 2. Frontend'den gelen mesajı al
+    const body = await req.json();
+    const { prompt } = body;
 
-    // 3. Groq AI'a istek at (Server-to-Server)
+    // 3. Groq'a İstek Gönder
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -28,10 +35,16 @@ export async function POST(req: Request) {
 
     const data = await response.json();
 
-    // 4. Cevabı Frontend'e geri yolla
-    return NextResponse.json({ content: data.choices[0].message.content });
+    if (data.error) {
+      console.error("Groq Hatası:", data.error);
+      throw new Error(data.error.message);
+    }
+
+    // 4. Cevabı Döndür
+    return NextResponse.json(data);
 
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Sunucu Hatası:", error);
+    return NextResponse.json({ error: error.message || "Bilinmeyen bir hata oluştu." }, { status: 500 });
   }
 }
